@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Abyssal Ascent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface: #bfe9ff;
+    --shallow: #2f9fd8;
+    --mid: #146199;
+    --deep: #06263f;
+    --cyan: #4deeea;
+    --magenta: #ff2e88;
+    --plankton: #b8ff5c;
+    --amber: #ffb15c;
+    --mist: #f2fbff;
+    --mist-dim: rgba(242, 251, 255, 0.68);
+    --ink: #04101c;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: var(--ink);
+    overflow: hidden;
+    font-family: 'Space Grotesk', sans-serif;
+    color: var(--mist);
+  }
+
+  #stage { position: relative; width: 100vw; height: 100vh; }
+
+  canvas#game {
+    display: block; width: 100%; height: 100%;
+    background: var(--ink);
+    touch-action: none;
+    cursor: none;
+  }
+
+  .hud {
+    position: absolute; top: 20px; left: 24px; right: 24px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    pointer-events: none; z-index: 5;
+  }
+  .hud-block { line-height: 1.1; }
+  .hud-label { font-size: 11px; letter-spacing: 0.04em; color: var(--mist-dim); margin-bottom: 2px; text-shadow: 0 1px 6px rgba(0,0,0,0.4);}
+  .hud-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hud-value.cyan { color: var(--cyan); text-shadow: 0 0 16px rgba(77, 238, 234, 0.6); }
+  .hud-value.magenta { color: var(--magenta); text-shadow: 0 0 16px rgba(255, 46, 136, 0.55); }
+
+  .stage-track {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    width: min(280px, 40vw); text-align: center; z-index: 5; pointer-events: none;
+  }
+  .stage-name { font-size: 13px; letter-spacing: 0.05em; color: var(--mist); margin-bottom: 6px; font-weight: 500; text-shadow: 0 1px 6px rgba(0,0,0,0.5);}
+  .stage-bar-bg { width: 100%; height: 4px; border-radius: 999px; background: rgba(4, 16, 28, 0.35); overflow: hidden; }
+  .stage-bar-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--cyan), var(--plankton)); box-shadow: 0 0 10px rgba(77, 238, 234, 0.6); transition: width 0.25s ease; }
+
+  .toast {
+    position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+    font-size: clamp(20px, 4vw, 30px); font-weight: 700; color: var(--mist);
+    text-shadow: 0 0 24px rgba(0,0,0,0.5);
+    opacity: 0; z-index: 6; pointer-events: none; text-align: center;
+    transition: opacity 0.35s ease, transform 0.35s ease; letter-spacing: 0.01em;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .toast .sub { display:block; font-size: 13px; font-weight: 400; color: var(--mist-dim); margin-top: 4px; letter-spacing: 0.03em; }
+
+  .hiding-badge {
+    position: absolute; top: 68px; left: 50%; transform: translateX(-50%) translateY(-6px);
+    background: rgba(4, 16, 28, 0.55); border: 1px solid rgba(184,255,92,0.4);
+    color: var(--plankton); font-size: 12px; font-weight: 500; letter-spacing: 0.02em;
+    padding: 6px 14px; border-radius: 999px; z-index: 5; pointer-events: none;
+    opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .hiding-badge.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .minimap {
+    position: absolute; bottom: 20px; right: 20px; width: 130px; height: 88px;
+    border: 1px solid rgba(242,251,255,0.25); border-radius: 8px;
+    background: rgba(4, 16, 28, 0.45); z-index: 5; overflow: hidden;
+  }
+
+  .overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 24px;
+    z-index: 10;
+    background: radial-gradient(ellipse at 50% 45%, rgba(20, 97, 153, 0.55) 0%, rgba(4, 16, 28, 0.9) 72%);
+    transition: opacity 0.4s ease;
+  }
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .title {
+    font-size: clamp(34px, 7vw, 56px); font-weight: 700; margin: 0; letter-spacing: -0.01em;
+    background: linear-gradient(180deg, var(--mist) 0%, var(--cyan) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 22px rgba(77, 238, 234, 0.35));
+  }
+
+  .subtitle { font-size: 15px; color: var(--mist-dim); max-width: 420px; margin: 14px 0 30px; line-height: 1.6; }
+  .subtitle b { color: var(--plankton); font-weight: 500; }
+  .subtitle .m { color: var(--magenta); font-weight: 500; }
+
+  .go-score { font-size: 15px; color: var(--mist-dim); margin-bottom: 26px; }
+  .go-score .n { font-size: 22px; color: var(--cyan); font-weight: 700; }
+  .go-score .stagename { color: var(--amber); font-weight: 500; }
+
+  button {
+    font-family: inherit; font-size: 16px; font-weight: 500; letter-spacing: 0.01em;
+    color: var(--ink); background: var(--cyan); border: none; border-radius: 999px;
+    padding: 14px 34px; cursor: pointer; box-shadow: 0 0 30px rgba(77, 238, 234, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  button:hover { transform: translateY(-2px); box-shadow: 0 0 40px rgba(77, 238, 234, 0.5); }
+  button:active { transform: translateY(0); }
+
+  .hint {
+    position: absolute; bottom: 22px; left: 0; right: 0; text-align: center;
+    font-size: 12px; color: var(--mist-dim); z-index: 5; pointer-events: none; letter-spacing: 0.02em;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+  }
+
+  /* evolution choice overlay */
+  .choice-title { font-size: clamp(24px, 5vw, 34px); font-weight: 700; margin: 0 0 6px; color: var(--mist); }
+  .choice-sub { font-size: 13px; color: var(--mist-dim); margin-bottom: 24px; }
+  .choice-cards { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; max-width: 720px; }
+  .choice-card {
+    width: 190px; background: rgba(242,251,255,0.06); border: 1px solid rgba(242,251,255,0.16);
+    border-radius: 16px; padding: 14px; cursor: pointer; transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .choice-card:hover { transform: translateY(-4px); background: rgba(242,251,255,0.12); border-color: rgba(77,238,234,0.5); }
+  .choice-card canvas { display: block; margin-bottom: 8px; }
+  .choice-card .cname { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .choice-card .cblurb { font-size: 12px; color: var(--mist-dim); line-height: 1.4; margin-bottom: 8px; min-height: 34px; }
+  .choice-card .cstat { font-size: 11px; color: var(--plankton); letter-spacing: 0.03em; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div class="hud">
+    <div class="hud-block">
+      <div class="hud-label">size</div>
+      <div class="hud-value cyan" id="sizeVal">10</div>
+    </div>
+    <div class="hud-block" style="text-align:right;">
+      <div class="hud-label">largest reached</div>
+      <div class="hud-value magenta" id="bestVal">10</div>
+    </div>
+  </div>
+
+  <div class="stage-track">
+    <div class="stage-name" id="stageName">Larva</div>
+    <div class="stage-bar-bg"><div class="stage-bar-fill" id="stageBar"></div></div>
+  </div>
+
+  <div class="hiding-badge" id="hidingBadge">🪸 Hidden in the coral</div>
+
+  <div class="toast" id="toast">Evolved<span class="sub" id="toastSub"></span></div>
+
+  <canvas class="minimap" id="minimap" width="130" height="88"></canvas>
+
+  <div class="overlay" id="startOverlay">
+    <h1 class="title">Abyssal Ascent</h1>
+    <p class="subtitle">
+      Hatch in the sunlit shallows as a tiny larva. Eat anything <b>smaller and dimmer</b> to grow,
+      avoid anything <span class="m">larger and brighter</span> — one bite and it's over.
+      The sea is vast now — every time you grow enough, <b>choose</b> what you evolve into.
+    </p>
+    <button id="startBtn">Begin the hunt</button>
+  </div>
+
+  <div class="overlay hidden" id="overOverlay">
+    <h1 class="title" style="font-size: clamp(30px, 6vw, 46px);">Devoured</h1>
+    <p class="go-score">You reached <span class="n" id="finalSize">10</span> size as a <span class="stagename" id="finalStage">Larva</span></p>
+    <button id="retryBtn">Hatch again</button>
+  </div>
+
+  <div class="overlay hidden" id="choiceOverlay">
+    <h1 class="choice-title">Evolve</h1>
+    <p class="choice-sub">Choose your next form</p>
+    <div class="choice-cards" id="choiceCards"></div>
+  </div>
+
+  <div class="hint" id="hint">move: arrow keys / WASD / drag &nbsp;·&nbsp; eat dim &amp; small, flee bright &amp; big</div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const mmCanvas = document.getElementById('minimap');
+  const mmCtx = mmCanvas.getContext('2d');
+  const startOverlay = document.getElementById('startOverlay');
+  const overOverlay = document.getElementById('overOverlay');
+  const choiceOverlay = document.getElementById('choiceOverlay');
+  const choiceCards = document.getElementById('choiceCards');
+  const sizeVal = document.getElementById('sizeVal');
+  const bestVal = document.getElementById('bestVal');
+  const finalSize = document.getElementById('finalSize');
+  const finalStage = document.getElementById('finalStage');
+  const hint = document.getElementById('hint');
+  const stageNameEl = document.getElementById('stageName');
+  const stageBar = document.getElementById('stageBar');
+  const hidingBadge = document.getElementById('hidingBadge');
+  const toast = document.getElementById('toast');
+  const toastSub = document.getElementById('toastSub');
+
+  let W, H, DPR;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // The ocean expands as you evolve. It starts compact, then unlocks more
+  // of the world after the second evolution and every evolution after that.
+  // Index 0 = Larva + first evolution (no expansion yet). Index N = after
+  // reaching evolution stage N+1.
+  const WORLD_SIZES = [
+    { w: 1600, h: 1050 }, // Larva + first evolution (compact starting sea)
+    { w: 2150, h: 1400 }, // after 2nd evolution
+    { w: 2650, h: 1700 }, // after 3rd evolution
+    { w: 3100, h: 1950 }, // after 4th evolution
+    { w: 3400, h: 2100 }, // after 5th evolution
+    { w: 3600, h: 2200 }  // after 6th evolution (full original map size)
+  ];
+  let WORLD_W = WORLD_SIZES[0].w, WORLD_H = WORLD_SIZES[0].h;
+  let worldTargetW = WORLD_W, worldTargetH = WORLD_H;
+  let worldExpandStartW = WORLD_W, worldExpandStartH = WORLD_H;
+  let worldExpandT = 1;
+  let worldExpandTimer = 0;
+
+  // Terrain is generated for the full possible world, but only becomes
+  // reachable when the ocean expands.
+  let terrain = [];
+  function seededRandom(seed) {
+    let x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
+  function generateTerrain() {
+    terrain = [];
+    let seed = 17;
+    // Islands near the surface.
+    for (let i = 0; i < 14; i++) {
+      const x = 150 + seededRandom(seed++) * 3300;
+      const y = 40 + seededRandom(seed++) * 300;
+      const rx = 70 + seededRandom(seed++) * 150;
+      const ry = 38 + seededRandom(seed++) * 75;
+      terrain.push({ type:'island', x, y, rx, ry, rot:(seededRandom(seed++)-.5)*0.35 });
+    }
+    // Coral reefs scattered through shallower and mid-depth water.
+    for (let i = 0; i < 42; i++) {
+      const x = 100 + seededRandom(seed++) * 3400;
+      const y = 300 + seededRandom(seed++) * 950;
+      terrain.push({ type:'reef', x, y, r:28 + seededRandom(seed++) * 68, seed:seed++ });
+    }
+    // Big underwater coral mountains / seamounts.
+    for (let i = 0; i < 22; i++) {
+      const x = 100 + seededRandom(seed++) * 3400;
+      const y = 900 + seededRandom(seed++) * 1200;
+      terrain.push({ type:'mountain', x, y, r:70 + seededRandom(seed++) * 130, seed:seed++ });
+    }
+  }
+  generateTerrain();
+
+  function drawTerrain() {
+    for (const t of terrain) {
+      // Do not draw terrain outside the currently unlocked ocean.
+      if (t.x < -t.rx && t.x > WORLD_W + t.rx) continue;
+      if (t.x - (t.rx || t.r*1.5) > WORLD_W || t.y - (t.ry || t.r*1.5) > WORLD_H) continue;
+      const sx = t.x - camX, sy = t.y - camY;
+      if (sx < -500 || sx > W + 500 || sy < -500 || sy > H + 500) continue;
+      ctx.save();
+      ctx.translate(sx, sy);
+      if (t.type === 'island') {
+        ctx.rotate(t.rot);
+        ctx.fillStyle = 'rgba(34,104,78,0.95)';
+        ctx.beginPath(); ctx.ellipse(0, 10, t.rx*1.05, t.ry*1.05, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'rgba(238,214,145,0.95)';
+        ctx.beginPath(); ctx.ellipse(0, 0, t.rx, t.ry, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'rgba(72,140,83,0.9)';
+        ctx.beginPath(); ctx.ellipse(-t.rx*0.12, -0.08 * t.ry, t.rx*0.72, t.ry*0.62, 0, 0, Math.PI*2); ctx.fill();
+        for (let j=0;j<4;j++) {
+          const a = j*1.7 + t.x*0.01;
+          const tx = Math.cos(a)*t.rx*0.42, ty = Math.sin(a)*t.ry*0.4;
+          ctx.strokeStyle='rgba(35,75,45,0.9)'; ctx.lineWidth=3;
+          ctx.beginPath(); ctx.moveTo(tx,ty+5); ctx.lineTo(tx-4,ty-18); ctx.stroke();
+          ctx.fillStyle='rgba(52,122,70,0.95)'; ctx.beginPath(); ctx.arc(tx-5,ty-20,9,0,Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(tx+4,ty-18,8,0,Math.PI*2); ctx.fill();
+        }
+      } else if (t.type === 'reef') {
+        ctx.fillStyle='rgba(80,185,170,0.20)'; ctx.beginPath(); ctx.arc(0,0,t.r*1.25,0,Math.PI*2); ctx.fill();
+        const colors=['rgba(255,105,160,0.9)','rgba(255,185,90,0.9)','rgba(120,225,190,0.9)','rgba(180,120,255,0.9)'];
+        for(let j=0;j<7;j++){
+          const a=seededRandom(t.seed+j*4)*Math.PI*2, rr=t.r*(0.25+seededRandom(t.seed+j*4+1)*0.65);
+          const cx=Math.cos(a)*rr, cy=Math.sin(a)*rr*0.65;
+          ctx.strokeStyle=colors[j%colors.length]; ctx.lineWidth=Math.max(2,t.r*0.045); ctx.lineCap='round';
+          ctx.beginPath(); ctx.moveTo(cx,cy+8); ctx.lineTo(cx-5,cy-rr*0.35); ctx.moveTo(cx,cy+8); ctx.lineTo(cx+6,cy-rr*0.5); ctx.stroke();
+          ctx.fillStyle=colors[j%colors.length]; ctx.beginPath(); ctx.arc(cx-5,cy-rr*0.35,4,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(cx+6,cy-rr*0.5,4,0,Math.PI*2); ctx.fill();
+        }
+      } else {
+        // Underwater coral mountain / seamount.
+        const g=ctx.createRadialGradient(-t.r*0.25,-t.r*0.35,t.r*0.1,0,0,t.r*1.35);
+        g.addColorStop(0,'rgba(96,119,112,0.95)'); g.addColorStop(1,'rgba(21,55,65,0.95)');
+        ctx.fillStyle=g; ctx.beginPath();
+        ctx.moveTo(-t.r*1.15,t.r*0.55); ctx.quadraticCurveTo(-t.r*0.8,-t.r*0.25,-t.r*0.35,-t.r*0.8);
+        ctx.quadraticCurveTo(0,-t.r*1.35,t.r*0.35,-t.r*0.72);
+        ctx.quadraticCurveTo(t.r*0.85,-t.r*0.25,t.r*1.2,t.r*0.55); ctx.closePath(); ctx.fill();
+        for(let j=0;j<9;j++){
+          const a=seededRandom(t.seed+j*2)*Math.PI*2, rr=t.r*(0.35+seededRandom(t.seed+j*2+1)*0.55);
+          const cx=Math.cos(a)*rr, cy=Math.sin(a)*rr*0.55;
+          ctx.fillStyle=['rgba(255,80,145,0.8)','rgba(255,160,80,0.8)','rgba(110,220,190,0.8)'][j%3];
+          ctx.beginPath(); ctx.arc(cx,cy,5+seededRandom(j+t.seed)*5,0,Math.PI*2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+  }
+
+  function setWorldForStage(stageIdx, instant) {
+    // stage 0/1 both use WORLD_SIZES[0]; stage N (N>=1) uses WORLD_SIZES[N-1]
+    const idx = Math.max(0, Math.min(WORLD_SIZES.length - 1, stageIdx - 1));
+    const target = WORLD_SIZES[idx];
+    if (target.w <= WORLD_W && target.h <= WORLD_H && !instant) return;
+    worldExpandStartW = WORLD_W; worldExpandStartH = WORLD_H;
+    worldTargetW = target.w; worldTargetH = target.h;
+    worldExpandT = instant ? 1 : 0;
+    worldExpandTimer = instant ? 0 : 2200;
+    if (instant) { WORLD_W = target.w; WORLD_H = target.h; }
+  }
+
+  function updateWorldExpansion(dt) {
+    if (worldExpandT >= 1) return;
+    worldExpandTimer = Math.max(0, worldExpandTimer - dt);
+    const p = 1 - worldExpandTimer / 2200;
+    const ease = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+    worldExpandT = ease;
+    WORLD_W = Math.round(worldExpandStartW + (worldTargetW-worldExpandStartW)*ease);
+    WORLD_H = Math.round(worldExpandStartH + (worldTargetH-worldExpandStartH)*ease);
+  }
+
+
+  // ---------- creature body renderers ----------
+  function bodyFish(g, r, tail, color, opt) {
+    opt = opt || {};
+    const tailWag = Math.sin(tail) * 0.5;
+    g.beginPath();
+    g.moveTo(-r * 0.85, 0);
+    g.lineTo(-r * 1.7, -r * 0.65 + tailWag * r * 0.55);
+    g.lineTo(-r * 1.7, r * 0.65 + tailWag * r * 0.55);
+    g.closePath();
+    g.fillStyle = `rgba(${color},0.85)`; g.fill();
+
+    g.beginPath();
+    g.ellipse(0, 0, r, r * 0.58, 0, 0, Math.PI * 2);
+    g.fillStyle = `rgba(${color},0.97)`; g.fill();
+
+    const finH = opt.tall ? 1.3 : 0.85;
+    g.beginPath();
+    g.moveTo(-r * 0.15, -r * 0.5);
+    g.lineTo(r * 0.1, -r * finH);
+    g.lineTo(r * 0.4, -r * 0.48);
+    g.closePath();
+    g.fillStyle = `rgba(${color},0.55)`; g.fill();
+
+    g.beginPath();
+    g.arc(r * 0.42, -r * 0.08, Math.max(1.1, r * 0.12), 0, Math.PI * 2);
+    g.fillStyle = 'rgba(4,16,28,0.9)'; g.fill();
+  }
+
+  function bodyJellyfish(g, r, tail, color) {
+    g.beginPath();
+    g.arc(0, -r * 0.1, r * 0.85, Math.PI, 0);
+    g.fillStyle = `rgba(${color},0.55)`; g.fill();
+    for (let i = -2; i <= 2; i++) {
+      const off = i * r * 0.28;
+      const wob = Math.sin(tail + i) * r * 0.35;
+      g.beginPath();
+      g.moveTo(off, -r * 0.05);
+      g.quadraticCurveTo(off + wob * 0.3, r * 0.9, off + wob, r * 1.6);
+      g.strokeStyle = `rgba(${color},0.55)`;
+      g.lineWidth = Math.max(1.5, r * 0.09);
+      g.stroke();
+    }
+    g.beginPath();
+    g.arc(-r * 0.25, -r * 0.2, Math.max(1, r * 0.08), 0, Math.PI * 2);
+    g.arc(r * 0.25, -r * 0.2, Math.max(1, r * 0.08), 0, Math.PI * 2);
+    g.fillStyle = 'rgba(4,16,28,0.7)'; g.fill();
+  }
+
+  function bodyEel(g, r, tail, color) {
+    g.beginPath();
+    g.moveTo(r * 1.6, 0);
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      const x = r * 1.6 - t * r * 3.2;
+      const y = Math.sin(tail + t * 5) * r * 0.5 * t;
+      g.lineTo(x, y);
+    }
+    g.strokeStyle = `rgba(${color},0.92)`;
+    g.lineWidth = Math.max(2, r * 0.55);
+    g.lineCap = 'round';
+    g.stroke();
+    g.beginPath();
+    g.arc(r * 1.5, 0, r * 0.32, 0, Math.PI * 2);
+    g.fillStyle = `rgba(${color},0.97)`; g.fill();
+    g.beginPath();
+    g.arc(r * 1.62, -r * 0.06, Math.max(1, r * 0.07), 0, Math.PI * 2);
+    g.fillStyle = 'rgba(4,16,28,0.85)'; g.fill();
+  }
+
+  function bodyOctopus(g, r, tail, color) {
+    g.beginPath();
+    g.arc(0, -r * 0.15, r * 0.75, Math.PI * 1.05, Math.PI * -0.05);
+    g.fillStyle = `rgba(${color},0.95)`; g.fill();
+    for (let i = 0; i < 6; i++) {
+      const baseA = (i / 5 - 0.5) * r * 1.3;
+      const wob = Math.sin(tail + i * 1.1) * r * 0.4;
+      g.beginPath();
+      g.moveTo(baseA * 0.5, r * 0.1);
+      g.quadraticCurveTo(baseA * 0.7 + wob * 0.4, r * 0.9, baseA + wob, r * 1.5);
+      g.strokeStyle = `rgba(${color},0.7)`;
+      g.lineWidth = Math.max(1.5, r * 0.14);
+      g.lineCap = 'round';
+      g.stroke();
+    }
+    g.beginPath();
+    g.arc(-r * 0.22, -r * 0.2, Math.max(1.2, r * 0.1), 0, Math.PI * 2);
+    g.arc(r * 0.22, -r * 0.2, Math.max(1.2, r * 0.1), 0, Math.PI * 2);
+    g.fillStyle = 'rgba(4,16,28,0.85)'; g.fill();
+  }
+
+  function bodyRay(g, r, tail, color) {
+    const flap = Math.sin(tail) * 0.28;
+    g.beginPath();
+    g.moveTo(r * 1.1, 0);
+    g.quadraticCurveTo(r * 0.1, -r * (1.0 + flap), -r * 0.9, -r * 0.15);
+    g.quadraticCurveTo(-r * 0.4, 0, -r * 0.9, r * 0.15);
+    g.quadraticCurveTo(r * 0.1, r * (1.0 + flap), r * 1.1, 0);
+    g.closePath();
+    g.fillStyle = `rgba(${color},0.92)`; g.fill();
+    g.beginPath();
+    g.moveTo(-r * 0.85, 0);
+    g.lineTo(-r * 2.0, r * 0.12 * Math.sin(tail * 1.5));
+    g.strokeStyle = `rgba(${color},0.7)`;
+    g.lineWidth = Math.max(1, r * 0.08);
+    g.stroke();
+    g.beginPath();
+    g.arc(r * 0.55, -r * 0.08, Math.max(1, r * 0.07), 0, Math.PI * 2);
+    g.fillStyle = 'rgba(4,16,28,0.75)'; g.fill();
+  }
+
+  function bodyShark(g, r, tail, color, opt) {
+    opt = opt || {};
+    const tailWag = Math.sin(tail) * 0.4;
+    g.beginPath();
+    g.ellipse(0, 0, r * 1.15, r * 0.5, 0, 0, Math.PI * 2);
+    g.fillStyle = `rgba(${color},0.96)`; g.fill();
+
+    g.beginPath();
+    g.moveTo(-r * 1.05, 0);
+    g.lineTo(-r * 1.8, -r * 0.55 + tailWag * r * 0.5);
+    g.lineTo(-r * 1.55, 0);
+    g.lineTo(-r * 1.8, r * 0.55 + tailWag * r * 0.5);
+    g.closePath();
+    g.fillStyle = `rgba(${color},0.85)`; g.fill();
+
+    g.beginPath();
+    g.moveTo(-r * 0.1, -r * 0.42);
+    g.lineTo(r * 0.15, -r * 1.05);
+    g.lineTo(r * 0.35, -r * 0.4);
+    g.closePath();
+    g.fillStyle = `rgba(${color},0.85)`; g.fill();
+
+    if (opt.accent) {
+      g.beginPath();
+      g.ellipse(-r * 0.1, r * 0.18, r * 0.75, r * 0.18, 0, 0, Math.PI * 2);
+      g.fillStyle = `rgba(${opt.accent},0.9)`; g.fill();
+    }
+
+    if (opt.hammerhead) {
+      g.beginPath();
+      g.ellipse(r * 0.9, 0, r * 0.13, r * 0.55, 0, 0, Math.PI * 2);
+      g.fillStyle = `rgba(${color},0.92)`; g.fill();
+      g.beginPath();
+      g.arc(r * 0.9, -r * 0.45, Math.max(1, r * 0.08), 0, Math.PI * 2);
+      g.arc(r * 0.9, r * 0.45, Math.max(1, r * 0.08), 0, Math.PI * 2);
+      g.fillStyle = 'rgba(4,16,28,0.9)'; g.fill();
+    } else {
+      g.beginPath();
+      g.arc(r * 0.85, -r * 0.05, Math.max(1.2, r * 0.09), 0, Math.PI * 2);
+      g.fillStyle = 'rgba(4,16,28,0.9)'; g.fill();
+    }
+  }
+
+  function bodyTurtle(g, r, tail, color) {
+    const flap = Math.sin(tail) * 0.3;
+    g.beginPath();
+    g.ellipse(-r * 0.5 - flap * r * 0.3, flap * r * 0.5, r * 0.55, r * 0.3, 0.3, 0, Math.PI * 2);
+    g.ellipse(-r * 0.5 - flap * r * 0.3, -flap * r * 0.5, r * 0.55, r * 0.3, -0.3, 0, Math.PI * 2);
+    g.fillStyle = `rgba(${color},0.75)`; g.fill();
+    g.beginPath();
+    g.ellipse(0, 0, r, r * 0.72, 0, 0, Math.PI * 2);
+    g.fillStyle = `rgba(${color},0.95)`; g.fill();
+    g.beginPath();
+    g.arc(r * 0.95, 0, r * 0.28, 0, Math.PI * 2);
+    g.fillStyle = `rgba(${color},0.95)`; g.fill();
+    g.beginPath();
+    g.arc(r * 1.08, -r * 0.05, Math.max(1, r * 0.07), 0, Math.PI * 2);
+    g.fillStyle = 'rgba(4,16,28,0.85)'; g.fill();
+  }
+
+  function bodyPuffer(g, r, tail, color) {
+    const rr = r * (0.95 + Math.sin(tail * 0.6) * 0.03);
+    const spikes = 10;
+    g.fillStyle = `rgba(${color},0.8)`;
+    for (let i = 0; i < spikes; i++) {
+      const a = (i / spikes) * Math.PI * 2;
+      const bx = Math.cos(a) * rr, by = Math.sin(a) * rr * 0.85;
+      const tx = Math.cos(a) * rr * 1.5, ty = Math.sin(a) * rr * 1.5 * 0.85;
+      const perp = a + Math.PI / 2;
+      const w = rr * 0.09;
+      g.beginPath();
+      g.moveTo(bx + Math.cos(perp) * w, by + Math.sin(perp) * w * 0.85);
+      g.lineTo(tx, ty);
+      g.lineTo(bx - Math.cos(perp) * w, by - Math.sin(perp) * w * 0.85);
+      g.closePath(); g.fill();
+    }
+    g.beginPath();
+    g.ellipse(0, 0, rr, rr * 0.85, 0, 0, Math.PI * 2);
+    g.fillStyle = `rgba(${color},0.97)`; g.fill();
+    g.beginPath();
+    g.moveTo(-rr * 0.1, rr * 0.5);
+    g.lineTo(-rr * 0.35, rr * 0.9);
+    g.lineTo(rr * 0.15, rr * 0.65);
+    g.closePath();
+    g.fillStyle = `rgba(${color},0.55)`; g.fill();
+    g.beginPath();
+    g.arc(rr * 0.45, -rr * 0.15, Math.max(1.2, rr * 0.13), 0, Math.PI * 2);
+    g.fillStyle = 'rgba(4,16,28,0.9)'; g.fill();
+  }
+
+  const BODY_FN = { fish: bodyFish, jellyfish: bodyJellyfish, eel: bodyEel, octopus: bodyOctopus, ray: bodyRay, shark: bodyShark, turtle: bodyTurtle, puffer: bodyPuffer };
+
+  function renderCreature(g, entity, glowAlpha, tint) {
+    const r = entity.r, sp = entity.species, dir = entity.dir || 1;
+    const color = sp.color;
+    g.save();
+    g.translate(entity.x - (entity._camX || 0), entity.y - (entity._camY || 0));
+    g.scale(dir, 1);
+
+    const glowR = r * (2.1 + glowAlpha);
+    const grad = g.createRadialGradient(0, 0, 0, 0, 0, glowR);
+    const gc = tint || color;
+    grad.addColorStop(0, `rgba(${gc},${0.3 + glowAlpha * 0.3})`);
+    grad.addColorStop(1, `rgba(${gc},0)`);
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(0, 0, glowR, 0, Math.PI * 2); g.fill();
+
+    const fn = BODY_FN[sp.bodyType] || bodyFish;
+    fn(g, r, entity.tail || 0, color, sp);
+    g.restore();
+  }
+
+  // ---------- evolution tree ----------
+  const LARVA = { name: 'Larva', bodyType: 'fish', color: '242,251,255', speed: 1.0 };
+  const EVOLUTIONS = [
+    null,
+    { minR: 26, options: [
+        { name: 'Minnow', bodyType: 'fish', color: '77,238,234', speed: 1.0, blurb: 'Balanced and steady.' },
+        { name: 'Sardine', bodyType: 'fish', color: '242,251,255', speed: 1.18, blurb: 'Small, quick, slippery.' },
+        { name: 'Guppy', bodyType: 'fish', color: '255,170,210', speed: 1.08, blurb: 'Playful, hard to pin down.' }
+    ]},
+    { minR: 42, options: [
+        { name: 'Clownfish', bodyType: 'fish', color: '255,157,77', speed: 0.95, blurb: 'Sturdy reef dweller.' },
+        { name: 'Angelfish', bodyType: 'fish', color: '184,255,92', speed: 1.1, tall: true, blurb: 'Tall fins, sharp turns.' },
+        { name: 'Jellyfish', bodyType: 'jellyfish', color: '255,120,200', speed: 0.78, blurb: 'Drifts, easy to miss.' },
+        { name: 'Lionfish', bodyType: 'fish', color: '255,110,90', speed: 0.9, tall: true, blurb: 'Striking, deliberate mover.' }
+    ]},
+    { minR: 62, options: [
+        { name: 'Moray Eel', bodyType: 'eel', color: '120,210,140', speed: 1.22, blurb: 'Long, fast, sneaky.' },
+        { name: 'Octopus', bodyType: 'octopus', color: '190,110,205', speed: 0.92, blurb: 'Clever, strong-armed.' },
+        { name: 'Stingray', bodyType: 'ray', color: '224,196,140', speed: 1.02, blurb: 'Wide glide, calm hunter.' },
+        { name: 'Squid', bodyType: 'octopus', color: '120,150,230', speed: 1.15, blurb: 'Jet-propelled and slippery.' }
+    ]},
+    { minR: 88, options: [
+        { name: 'Reef Shark', bodyType: 'shark', color: '140,175,205', speed: 1.28, blurb: 'Aggressive, relentless.' },
+        { name: 'Sea Turtle', bodyType: 'turtle', color: '120,205,150', speed: 0.85, blurb: 'Tough, unhurried.' },
+        { name: 'Manta Ray', bodyType: 'ray', color: '95,120,190', speed: 1.0, blurb: 'Graceful, enormous.' },
+        { name: 'Pufferfish', bodyType: 'puffer', color: '255,214,120', speed: 0.8, blurb: 'Round, tough, surprisingly nimble.' }
+    ]},
+    { minR: 120, options: [
+        { name: 'Great White', bodyType: 'shark', color: '205,208,215', speed: 1.22, blurb: 'Feared apex predator.' },
+        { name: 'Orca', bodyType: 'shark', color: '25,25,35', accent: '240,240,245', speed: 1.38, blurb: 'Fastest apex hunter.' },
+        { name: 'Hammerhead', bodyType: 'shark', color: '130,160,190', hammerhead: true, speed: 1.3, blurb: 'Wide-headed ambush hunter.' },
+        { name: 'Giant Squid', bodyType: 'octopus', color: '150,60,110', speed: 1.05, blurb: 'Colossal and ancient.' }
+    ]},
+    { minR: 158, options: [
+        { name: 'Megalodon', bodyType: 'shark', color: '150,70,60', accent: '210,140,120', speed: 1.15, blurb: 'Prehistoric apex terror.' },
+        { name: 'Leviathan', bodyType: 'shark', color: '15,15,25', accent: '77,238,234', speed: 1.25, blurb: 'The abyss given form.' }
+    ]}
+  ];
+
+  let best = 10;
+  let running = false, paused = false;
+  let time = 0, last = 0;
+
+  const player = { x: 0, y: 0, r: 10, vx: 0, vy: 0, glow: 0, stage: 0, species: LARVA, tail: 0, dir: 1, invulnT: 0, hiding: false };
+  const keys = {};
+  let pointerActive = false, pointerTarget = null;
+
+  let fish = [];
+  let particles = [];
+  let bubbles = [];
+  let sparkles = [];
+  let food = [];
+  let camX = 0, camY = 0;
+
+  function currentEligibleStage(r) {
+    let idx = player.stage;
+    for (let i = player.stage + 1; i < EVOLUTIONS.length; i++) {
+      if (EVOLUTIONS[i] && r >= EVOLUTIONS[i].minR) idx = i; else break;
+    }
+    return idx;
+  }
+
+  function resetGame() {
+    time = 0;
+    player.r = 10; player.species = LARVA; player.stage = 0; player.invulnT = 0;
+    setWorldForStage(0, true);
+    player.x = WORLD_W * 0.5; player.y = WORLD_H * 0.32;
+    player.vx = 0; player.vy = 0;
+    camX = Math.max(0, Math.min(WORLD_W - W, player.x - W / 2));
+    camY = Math.max(0, Math.min(WORLD_H - H, player.y - H / 2));
+    fish = []; particles = []; bubbles = []; sparkles = []; food = [];
+    for (let i = 0; i < 26; i++) spawnBubble(true);
+    for (let i = 0; i < 40; i++) spawnSparkle(true);
+    for (let i = 0; i < 12; i++) spawnFish(true);
+    for (let i = 0; i < 16; i++) spawnFood(true);
+    sizeVal.textContent = Math.round(player.r);
+    updateStageUI();
+  }
+
+  function spawnBubble(initial) {
+    bubbles.push({
+      x: Math.random() * WORLD_W, y: initial ? Math.random() * WORLD_H : player.y + H,
+      r: 1.5 + Math.random() * 3.5, vy: 0.3 + Math.random() * 0.6,
+      drift: (Math.random() - 0.5) * 0.4, a: 0.14 + Math.random() * 0.2
+    });
+  }
+
+  function spawnSparkle(initial) {
+    sparkles.push({
+      x: Math.random() * WORLD_W, y: Math.random() * WORLD_H * 0.6,
+      r: 0.6 + Math.random() * 1.4, phase: Math.random() * Math.PI * 2,
+      speed: 0.3 + Math.random() * 0.4
+    });
+  }
+
+  // Ambient food: small drifting particles with their own size ("bodyweight").
+  // Eatable only once the player outweighs them — bigger food just sits there
+  // harmlessly until you've grown enough to take it.
+  function spawnFood(initial) {
+    const r = 2.5 + Math.random() * 11; // ranges from tiny to occasionally bigger than a fresh larva
+    let x, y;
+    if (initial) {
+      x = camX + Math.random() * W; y = camY + Math.random() * H;
+    } else {
+      const edge = Math.floor(Math.random() * 4);
+      const pad = 160;
+      if (edge === 0) { x = camX - pad; y = camY + Math.random() * H; }
+      else if (edge === 1) { x = camX + W + pad; y = camY + Math.random() * H; }
+      else if (edge === 2) { x = camX + Math.random() * W; y = camY - pad; }
+      else { x = camX + Math.random() * W; y = camY + H + pad; }
+    }
+    x = Math.max(-50, Math.min(WORLD_W + 50, x));
+    y = Math.max(-50, Math.min(WORLD_H + 50, y));
+    food.push({
+      x, y, r,
+      vx: (Math.random() - 0.5) * 0.12, vy: (Math.random() - 0.5) * 0.12 + 0.05,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+
+  const NPC_TIERS = [
+    { max: 9, pool: [
+        { bodyType: 'fish', color: '184,255,92' }, { bodyType: 'fish', color: '255,214,120' },
+        { bodyType: 'jellyfish', color: '190,225,255' }
+    ]},
+    { max: 16, pool: [
+        { bodyType: 'fish', color: '77,238,234' }, { bodyType: 'fish', color: '255,157,140' },
+        { bodyType: 'eel', color: '130,205,150' }
+    ]},
+    { max: 30, pool: [
+        { bodyType: 'fish', color: '242,251,255', tall: true }, { bodyType: 'ray', color: '224,196,140' },
+        { bodyType: 'octopus', color: '190,110,205' }, { bodyType: 'turtle', color: '120,205,150' }
+    ]},
+    { max: 9999, pool: [
+        { bodyType: 'shark', color: '150,172,200' }, { bodyType: 'ray', color: '95,120,190' },
+        { bodyType: 'shark', color: '40,42,55', accent: '225,225,230' }
+    ]}
+  ];
+  function speciesForSize(r) {
+    for (const tier of NPC_TIERS) if (r <= tier.max) return tier.pool[Math.floor(Math.random() * tier.pool.length)];
+    return NPC_TIERS[NPC_TIERS.length - 1].pool[0];
+  }
+
+  function countBigFish() {
+    let c = 0;
+    for (const f of fish) if (f.isBig) c++;
+    return c;
+  }
+
+  function pickSize() {
+    const roll = Math.random();
+    if (roll < 0.35) return { r: 3 + Math.random() * 5, isBig: false };
+    if (roll < 0.62) return { r: 7 + Math.random() * 9, isBig: false };
+    if (roll < 0.82) return { r: 14 + Math.random() * 16, isBig: false };
+
+    // Bigger fish are normally only 1.00x–1.35x your size.
+    // Rare predator: exactly 1 in 50 fish can be 1.50x–1.70x your size.
+    // Only up to 5 big fish are ever alive at once — once that cap is hit,
+    // spawns fall back to normal-sized fish instead.
+    if (countBigFish() >= 5) {
+      return { r: 8 + Math.random() * 18, isBig: false };
+    }
+    const rarePredator = Math.random() < (1 / 50);
+    const ratio = rarePredator
+      ? 1.50 + Math.random() * 0.20
+      : 1.00 + Math.random() * 0.35;
+    return { r: Math.max(16, player.r * ratio), isBig: true };
+  }
+
+  function spawnFish(initial) {
+    const picked = pickSize();
+    const r = picked.r;
+    const sp = speciesForSize(r);
+    let x, y, vx, vy;
+    const spd = (0.32 + Math.random() * 0.45) * (r > player.r * 1.1 ? 1.15 : 1);
+    if (initial) {
+      let tries = 0;
+      do {
+        x = camX + Math.random() * W; y = camY + Math.random() * H;
+        tries++;
+      } while (Math.hypot(x - player.x, y - player.y) < 160 && tries < 8);
+      const a = Math.random() * Math.PI * 2;
+      vx = Math.cos(a) * spd; vy = Math.sin(a) * spd;
+    } else {
+      const edge = Math.floor(Math.random() * 4);
+      const pad = 220;
+      if (edge === 0) { x = camX - pad; y = camY + Math.random() * H; vx = spd; vy = (Math.random() - 0.5) * spd; }
+      else if (edge === 1) { x = camX + W + pad; y = camY + Math.random() * H; vx = -spd; vy = (Math.random() - 0.5) * spd; }
+      else if (edge === 2) { x = camX + Math.random() * W; y = camY - pad; vy = spd; vx = (Math.random() - 0.5) * spd; }
+      else { x = camX + Math.random() * W; y = camY + H + pad; vy = -spd; vx = (Math.random() - 0.5) * spd; }
+    }
+    x = Math.max(-100, Math.min(WORLD_W + 100, x));
+    y = Math.max(-100, Math.min(WORLD_H + 100, y));
+    fish.push({ x, y, r, vx, vy, baseSpeed: spd, species: sp, wob: Math.random() * Math.PI * 2, tail: Math.random() * Math.PI * 2, dir: vx >= 0 ? 1 : -1, isBig: picked.isBig });
+  }
+
+  function emitBurst(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 2.5;
+      particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, color });
+    }
+  }
+
+  function updateStageUI() {
+    stageNameEl.textContent = player.species.name;
+    const next = EVOLUTIONS[player.stage + 1];
+    if (next) {
+      const prevMin = EVOLUTIONS[player.stage] ? EVOLUTIONS[player.stage].minR : 10;
+      const span = next.minR - prevMin;
+      const pct = Math.max(0, Math.min(1, (player.r - prevMin) / span));
+      stageBar.style.width = (pct * 100) + '%';
+    } else stageBar.style.width = '100%';
+  }
+
+  function showToast(name) {
+    toast.firstChild.textContent = 'Evolved: ' + name;
+    const expansionIdx = Math.max(0, Math.min(WORLD_SIZES.length - 1, player.stage - 1));
+    const expansion = WORLD_SIZES[expansionIdx];
+    toastSub.textContent = player.stage >= 2 ? ('the ocean expands to ' + expansion.w + ' × ' + expansion.h) : 'grow further to keep ascending';
+    toast.classList.add('show');
+    clearTimeout(window._toastT);
+    window._toastT = setTimeout(() => toast.classList.remove('show'), 1700);
+  }
+
+  function openEvolutionChoice(stageIdx) {
+    paused = true;
+    const def = EVOLUTIONS[stageIdx];
+    choiceCards.innerHTML = '';
+    def.options.forEach(opt => {
+      const card = document.createElement('div');
+      card.className = 'choice-card';
+      const cv = document.createElement('canvas');
+      cv.width = 120; cv.height = 100;
+      card.appendChild(cv);
+      const nm = document.createElement('div'); nm.className = 'cname'; nm.textContent = opt.name;
+      const bl = document.createElement('div'); bl.className = 'cblurb'; bl.textContent = opt.blurb;
+      const st = document.createElement('div'); st.className = 'cstat'; st.textContent = 'speed ' + opt.speed.toFixed(2) + 'x';
+      card.appendChild(nm); card.appendChild(bl); card.appendChild(st);
+      card.addEventListener('click', () => {
+        const oldStage = player.stage;
+        player.species = opt; player.stage = stageIdx;
+        if (stageIdx >= 2 && stageIdx > oldStage) {
+          setWorldForStage(stageIdx, false);
+        }
+        showToast(opt.name);
+        emitBurst(player.x, player.y, opt.color, 28);
+        choiceOverlay.classList.add('hidden');
+        paused = false;
+        updateStageUI();
+      });
+      choiceCards.appendChild(card);
+      const cctx = cv.getContext('2d');
+      cctx.translate(60, 55);
+      renderCreature(cctx, { x: 0, y: 0, r: 28, species: opt, tail: 0.7, dir: 1, _camX: 0, _camY: 0 }, 0.3, opt.color);
+    });
+    choiceOverlay.classList.remove('hidden');
+  }
+
+  // Input
+  window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+  function pointerPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    return { x: cx + camX, y: cy + camY };
+  }
+  canvas.addEventListener('mousedown', e => { pointerActive = true; pointerTarget = pointerPos(e); });
+  canvas.addEventListener('mousemove', e => { if (pointerActive) pointerTarget = pointerPos(e); });
+  window.addEventListener('mouseup', () => { pointerActive = false; });
+  canvas.addEventListener('touchstart', e => { pointerActive = true; pointerTarget = pointerPos(e); e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { pointerActive = true; pointerTarget = pointerPos(e); e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchend', () => { pointerActive = false; }, { passive: false });
+
+  function updatePlayer(dt) {
+    const baseSpeed = (0.20 - Math.min(player.r / 1100, 0.09)) * player.species.speed * dt;
+    let mx = 0, my = 0;
+    if (keys['arrowleft'] || keys['a']) mx -= 1;
+    if (keys['arrowright'] || keys['d']) mx += 1;
+    if (keys['arrowup'] || keys['w']) my -= 1;
+    if (keys['arrowdown'] || keys['s']) my += 1;
+
+    if (mx || my) {
+      const len = Math.hypot(mx, my) || 1;
+      player.vx = (mx / len) * baseSpeed; player.vy = (my / len) * baseSpeed;
+    } else if (pointerActive && pointerTarget) {
+      const dx = pointerTarget.x - player.x, dy = pointerTarget.y - player.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 1) {
+        const step = Math.min(dist, baseSpeed * 1.6);
+        player.vx = (dx / dist) * step; player.vy = (dy / dist) * step;
+      } else { player.vx = 0; player.vy = 0; }
+    } else {
+      player.vx *= 0.6; player.vy *= 0.6;
+      if (Math.abs(player.vx) < 0.02) player.vx = 0;
+      if (Math.abs(player.vy) < 0.02) player.vy = 0;
+    }
+
+    player.x += player.vx; player.y += player.vy;
+    player.x = Math.max(player.r + 4, Math.min(WORLD_W - player.r - 4, player.x));
+    player.y = Math.max(player.r + 4, Math.min(WORLD_H - player.r - 4, player.y));
+    player.glow *= 0.92;
+    player.tail += 0.16 * (dt / 16) * (1 + Math.min(player.r / 60, 1));
+    if (Math.abs(player.vx) > 0.02) player.dir = player.vx >= 0 ? 1 : -1;
+  }
+
+  function grow(amount) {
+    player.r += amount;
+    if (player.r > best) { best = player.r; bestVal.textContent = Math.round(best); }
+    sizeVal.textContent = Math.round(player.r);
+
+    const nextIdx = player.stage + 1;
+    if (EVOLUTIONS[nextIdx] && player.r >= EVOLUTIONS[nextIdx].minR) {
+      openEvolutionChoice(nextIdx);
+    }
+    updateStageUI();
+  }
+
+  function update(dt) {
+    time += dt / 1000;
+    updateWorldExpansion(dt);
+    updatePlayer(dt);
+    player.invulnT = Math.max(0, player.invulnT - dt);
+
+    camX = Math.max(0, Math.min(WORLD_W - W, player.x - W / 2));
+    camY = Math.max(0, Math.min(WORLD_H - H, player.y - H / 2));
+
+    // Hiding: tucked inside coral, predators stop hunting you.
+    player.hiding = false;
+    for (const t of terrain) {
+      if (t.type !== 'reef' && t.type !== 'mountain') continue;
+      const tdx = player.x - t.x, tdy = player.y - t.y;
+      if (Math.hypot(tdx, tdy) < t.r * 0.85) { player.hiding = true; break; }
+    }
+
+    const targetCount = 12 + Math.min(Math.floor(time / 10), 10);
+    const spawnRate = Math.max(950 - time * 3, 300);
+    if (!window._fT || time * 1000 - window._fT > spawnRate) {
+      if (fish.length < targetCount + 8) spawnFish(false);
+      window._fT = time * 1000;
+    }
+    if (Math.random() < 0.04) spawnBubble(false);
+    if (!window._foodT || time * 1000 - window._foodT > 900) {
+      if (food.length < 20) spawnFood(false);
+      window._foodT = time * 1000;
+    }
+
+    for (let i = food.length - 1; i >= 0; i--) {
+      const fd = food[i];
+      fd.phase += 0.03 * (dt / 16);
+      fd.x += fd.vx * (dt / 16) + Math.sin(fd.phase) * 0.08;
+      fd.y += fd.vy * (dt / 16);
+      const margin = 300;
+      if (fd.x < camX - margin || fd.x > camX + W + margin || fd.y < camY - margin || fd.y > camY + H + margin) {
+        food.splice(i, 1); continue;
+      }
+      const fdx = player.x - fd.x, fdy = player.y - fd.y;
+      const fdDist = Math.hypot(fdx, fdy);
+      if (fdDist < player.r + fd.r) {
+        // bodyweight rule: only eatable once you outweigh it — bigger food
+        // just sits there until you've grown enough
+        if (fd.r < player.r) {
+          food.splice(i, 1);
+          emitBurst(fd.x, fd.y, '255,214,140', 6 + Math.floor(fd.r));
+          player.glow = 0.6;
+          grow(Math.max(0.12, fd.r * 0.12));
+        }
+      }
+    }
+
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      const b = bubbles[i];
+      b.y -= b.vy; b.x += b.drift;
+      if (b.y < camY - 40) bubbles.splice(i, 1);
+    }
+    for (const s of sparkles) { s.phase += 0.02 * (dt / 16); }
+
+    for (let i = fish.length - 1; i >= 0; i--) {
+      const f = fish[i];
+      const ratio = f.r / player.r;
+      const dx = player.x - f.x, dy = player.y - f.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const detect = 220;
+
+      let sx = f.vx, sy = f.vy;
+      if (dist < detect && !player.hiding) {
+        if (ratio > 1.12) { sx += (dx / dist) * 0.022 * dt; sy += (dy / dist) * 0.022 * dt; }
+        else if (ratio < 0.82) { sx -= (dx / dist) * 0.018 * dt; sy -= (dy / dist) * 0.018 * dt; }
+      }
+      const sp = Math.hypot(sx, sy) || 1;
+      const desiredSp = f.baseSpeed * (ratio > 1.12 ? 1.3 : 1);
+      f.vx = (sx / sp) * desiredSp; f.vy = (sy / sp) * desiredSp;
+
+      f.wob += 0.05;
+      f.x += f.vx * (dt / 16) + Math.sin(f.wob) * 0.15;
+      f.y += f.vy * (dt / 16);
+      f.tail += 0.16 * (dt / 16) * (1 + Math.min(f.r / 60, 1));
+      if (Math.abs(f.vx) > 0.02) f.dir = f.vx >= 0 ? 1 : -1;
+
+      const margin = 380;
+      if (f.x < camX - margin || f.x > camX + W + margin || f.y < camY - margin || f.y > camY + H + margin) {
+        fish.splice(i, 1); continue;
+      }
+
+      // Elliptical hitbox matching the fish's visible squashed body shape
+      // (bodies render at ~0.6x height), instead of a loose circle — so
+      // grazing past a fish above/below it no longer counts as a touch.
+      const combinedRX = (f.r + player.r) * 0.88;
+      const combinedRY = (f.r + player.r) * 0.55;
+      const ex = dx / combinedRX, ey = dy / combinedRY;
+      const touching = (ex * ex + ey * ey) < 1;
+
+      if (touching) {
+        if (ratio <= 0.85) {
+          fish.splice(i, 1);
+          emitBurst(f.x, f.y, f.species.color, 9 + Math.floor(f.r / 4));
+          player.glow = 1;
+          grow(Math.max(0.3, f.r * 0.1));
+        } else if (ratio >= 1.18 && player.invulnT <= 0) {
+          if (ratio >= 1.6) {
+            gameOver(); return;
+          } else {
+            // graze: a moderately bigger fish costs size and knocks you back,
+            // rather than an instant kill — only much bigger predators are lethal
+            player.r = Math.max(9, player.r * 0.82);
+            sizeVal.textContent = Math.round(player.r);
+            updateStageUI();
+            const pushA = Math.atan2(player.y - f.y, player.x - f.x);
+            player.vx += Math.cos(pushA) * 3.2;
+            player.vy += Math.sin(pushA) * 3.2;
+            player.invulnT = 1100;
+            emitBurst(player.x, player.y, '255,46,136', 16);
+          }
+        }
+      }
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const pt = particles[i];
+      pt.x += pt.vx; pt.y += pt.vy;
+      pt.vx *= 0.94; pt.vy *= 0.94;
+      pt.life -= 0.03;
+      if (pt.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function drawBackground() {
+    const depthT = Math.max(0, Math.min(1, camY / (WORLD_H - H)));
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, mixHex('#bfe9ff', '#2f9fd8', depthT * 0.6));
+    grad.addColorStop(0.45, mixHex('#2f9fd8', '#146199', depthT));
+    grad.addColorStop(1, mixHex('#146199', '#06263f', depthT));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // sun rays
+    ctx.save();
+    ctx.globalAlpha = 0.16 * (1 - depthT * 0.7);
+    for (let i = 0; i < 4; i++) {
+      const baseX = ((i * 260 + time * 12) % (W + 400)) - 200;
+      const rg = ctx.createLinearGradient(baseX, -50, baseX + 160, H);
+      rg.addColorStop(0, 'rgba(255,255,255,0.8)');
+      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.moveTo(baseX, -50);
+      ctx.lineTo(baseX + 140, -50);
+      ctx.lineTo(baseX + 40, H);
+      ctx.lineTo(baseX - 60, H);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    for (const s of sparkles) {
+      const sx = s.x - camX, sy = s.y - camY;
+      if (sx < -10 || sx > W + 10 || sy < -10 || sy > H + 10) continue;
+      const a = 0.25 + Math.sin(s.phase) * 0.2;
+      ctx.beginPath();
+      ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${Math.max(0, a)})`;
+      ctx.fill();
+    }
+  }
+
+  function mixHex(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
+    const br = (pb >> 16) & 255, bg = (pb >> 8) & 255, bb = pb & 255;
+    const r = Math.round(ar + (br - ar) * t), gC = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+    return `rgb(${r},${gC},${bl})`;
+  }
+
+  function draw() {
+    drawBackground();
+    drawTerrain();
+
+    for (const b of bubbles) {
+      const sx = b.x - camX, sy = b.y - camY;
+      if (sx < -10 || sx > W + 10) continue;
+      ctx.beginPath(); ctx.arc(sx, sy, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${b.a})`; ctx.fill();
+    }
+
+    for (const fd of food) {
+      const sx = fd.x - camX, sy = fd.y - camY;
+      if (sx < -30 || sx > W + 30 || sy < -30 || sy > H + 30) continue;
+      const edible = fd.r < player.r;
+      const color = edible ? '255,214,140' : '255,120,120';
+      const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, fd.r * 2.4);
+      grad.addColorStop(0, `rgba(${color},${edible ? 0.55 : 0.3})`);
+      grad.addColorStop(1, `rgba(${color},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(sx, sy, fd.r * 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(${color},0.9)`;
+      ctx.arc(sx, sy, fd.r * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (const f of fish) {
+      f._camX = camX; f._camY = camY;
+      const ratio = f.r / player.r;
+      let tint = null;
+      if (ratio < 0.82) tint = '184,255,92';
+      else if (ratio > 1.18) tint = '255,46,136';
+      renderCreature(ctx, f, 0, tint);
+    }
+
+    for (const pt of particles) {
+      const sx = pt.x - camX, sy = pt.y - camY;
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(${pt.color},${pt.life})`;
+      ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    player._camX = camX; player._camY = camY;
+    const playerTint = player.invulnT > 0 && Math.floor(player.invulnT / 110) % 2 === 0 ? '255,80,140' : '255,255,255';
+    ctx.globalAlpha = player.hiding ? 0.5 : 1;
+    renderCreature(ctx, player, player.glow, playerTint);
+    ctx.globalAlpha = 1;
+
+    if (player.hiding !== window._wasHiding) {
+      hidingBadge.classList.toggle('show', player.hiding);
+      window._wasHiding = player.hiding;
+    }
+
+    drawMinimap();
+  }
+
+  function drawMinimap() {
+    mmCtx.clearRect(0, 0, 130, 88);
+    mmCtx.fillStyle = 'rgba(20,97,153,0.35)';
+    mmCtx.fillRect(0, 0, 130, 88);
+    const sx = 130 / WORLD_W, sy = 88 / WORLD_H;
+    mmCtx.strokeStyle = 'rgba(242,251,255,0.3)';
+    mmCtx.strokeRect(camX * sx, camY * sy, W * sx, H * sy);
+    for (const f of fish) {
+      const ratio = f.r / player.r;
+      if (ratio < 1.15 && f.r < 24) continue;
+      mmCtx.beginPath();
+      mmCtx.arc(f.x * sx, f.y * sy, 1.6, 0, Math.PI * 2);
+      mmCtx.fillStyle = ratio > 1.18 ? 'rgba(255,46,136,0.85)' : 'rgba(242,251,255,0.4)';
+      mmCtx.fill();
+    }
+    mmCtx.beginPath();
+    mmCtx.arc(player.x * sx, player.y * sy, 2.4, 0, Math.PI * 2);
+    mmCtx.fillStyle = '#4deeea';
+    mmCtx.fill();
+  }
+
+  function loop(ts) {
+    if (!running) return;
+    const dt = Math.min(ts - last, 42);
+    last = ts;
+    if (!paused) update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function gameOver() {
+    running = false;
+    finalSize.textContent = Math.round(player.r);
+    finalStage.textContent = player.species.name;
+    overOverlay.classList.remove('hidden');
+    hint.style.opacity = 0;
+  }
+
+  function startGame() {
+    resetGame();
+    startOverlay.classList.add('hidden');
+    overOverlay.classList.add('hidden');
+    choiceOverlay.classList.add('hidden');
+    hint.style.opacity = 1;
+    running = true; paused = false;
+    last = performance.now();
+    window._fT = 0;
+    requestAnimationFrame(loop);
+  }
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('retryBtn').addEventListener('click', startGame);
+
+  player.x = WORLD_W / 2; player.y = WORLD_H * 0.32;
+  resetGame();
+  draw();
+})();
+</script>
+</body>
+</html>
